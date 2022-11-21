@@ -6,10 +6,10 @@ option go_package = "https://github.com/michealmikeyb/ffv/tags";
 package ffv;
 
 service TagService {
-  rpc LikeTag(Tag) returns (BaseResponse) {}
-  rpc DisikeTag(Tag) returns (BaseResponse) {}
-  rpc LikeTags(Tags) returns (BaseResponse) {}
-  rpc DisikeTags(Tags) returns (BaseResponse) {}
+  rpc LikeTag(Tag) returns (TagBaseResponse) {}
+  rpc DisikeTag(Tag) returns (TagBaseResponse) {}
+  rpc LikeTags(Tags) returns (TagBaseResponse) {}
+  rpc DisikeTags(Tags) returns (TagBaseResponse) {}
 }
 
 message Tag {
@@ -21,7 +21,7 @@ message Tags {
   repeated Tag tags = 1;
 }
 
-message BaseResponse {
+message TagBaseResponse {
   string status = 1;
   string error = 2;
 }

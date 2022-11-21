@@ -22,10 +22,10 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TagServiceClient interface {
-	LikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*BaseResponse, error)
-	DisikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*BaseResponse, error)
-	LikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*BaseResponse, error)
-	DisikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*BaseResponse, error)
+	LikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*TagBaseResponse, error)
+	DisikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*TagBaseResponse, error)
+	LikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*TagBaseResponse, error)
+	DisikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*TagBaseResponse, error)
 }
 
 type tagServiceClient struct {
@@ -36,8 +36,8 @@ func NewTagServiceClient(cc grpc.ClientConnInterface) TagServiceClient {
 	return &tagServiceClient{cc}
 }
 
-func (c *tagServiceClient) LikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*BaseResponse, error) {
-	out := new(BaseResponse)
+func (c *tagServiceClient) LikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*TagBaseResponse, error) {
+	out := new(TagBaseResponse)
 	err := c.cc.Invoke(ctx, "/ffv.TagService/LikeTag", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -45,8 +45,8 @@ func (c *tagServiceClient) LikeTag(ctx context.Context, in *Tag, opts ...grpc.Ca
 	return out, nil
 }
 
-func (c *tagServiceClient) DisikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*BaseResponse, error) {
-	out := new(BaseResponse)
+func (c *tagServiceClient) DisikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*TagBaseResponse, error) {
+	out := new(TagBaseResponse)
 	err := c.cc.Invoke(ctx, "/ffv.TagService/DisikeTag", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -54,8 +54,8 @@ func (c *tagServiceClient) DisikeTag(ctx context.Context, in *Tag, opts ...grpc.
 	return out, nil
 }
 
-func (c *tagServiceClient) LikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*BaseResponse, error) {
-	out := new(BaseResponse)
+func (c *tagServiceClient) LikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*TagBaseResponse, error) {
+	out := new(TagBaseResponse)
 	err := c.cc.Invoke(ctx, "/ffv.TagService/LikeTags", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -63,8 +63,8 @@ func (c *tagServiceClient) LikeTags(ctx context.Context, in *Tags, opts ...grpc.
 	return out, nil
 }
 
-func (c *tagServiceClient) DisikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*BaseResponse, error) {
-	out := new(BaseResponse)
+func (c *tagServiceClient) DisikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*TagBaseResponse, error) {
+	out := new(TagBaseResponse)
 	err := c.cc.Invoke(ctx, "/ffv.TagService/DisikeTags", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -76,10 +76,10 @@ func (c *tagServiceClient) DisikeTags(ctx context.Context, in *Tags, opts ...grp
 // All implementations must embed UnimplementedTagServiceServer
 // for forward compatibility
 type TagServiceServer interface {
-	LikeTag(context.Context, *Tag) (*BaseResponse, error)
-	DisikeTag(context.Context, *Tag) (*BaseResponse, error)
-	LikeTags(context.Context, *Tags) (*BaseResponse, error)
-	DisikeTags(context.Context, *Tags) (*BaseResponse, error)
+	LikeTag(context.Context, *Tag) (*TagBaseResponse, error)
+	DisikeTag(context.Context, *Tag) (*TagBaseResponse, error)
+	LikeTags(context.Context, *Tags) (*TagBaseResponse, error)
+	DisikeTags(context.Context, *Tags) (*TagBaseResponse, error)
 	mustEmbedUnimplementedTagServiceServer()
 }
 
@@ -87,16 +87,16 @@ type TagServiceServer interface {
 type UnimplementedTagServiceServer struct {
 }
 
-func (UnimplementedTagServiceServer) LikeTag(context.Context, *Tag) (*BaseResponse, error) {
+func (UnimplementedTagServiceServer) LikeTag(context.Context, *Tag) (*TagBaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LikeTag not implemented")
 }
-func (UnimplementedTagServiceServer) DisikeTag(context.Context, *Tag) (*BaseResponse, error) {
+func (UnimplementedTagServiceServer) DisikeTag(context.Context, *Tag) (*TagBaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DisikeTag not implemented")
 }
-func (UnimplementedTagServiceServer) LikeTags(context.Context, *Tags) (*BaseResponse, error) {
+func (UnimplementedTagServiceServer) LikeTags(context.Context, *Tags) (*TagBaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LikeTags not implemented")
 }
-func (UnimplementedTagServiceServer) DisikeTags(context.Context, *Tags) (*BaseResponse, error) {
+func (UnimplementedTagServiceServer) DisikeTags(context.Context, *Tags) (*TagBaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DisikeTags not implemented")
 }
 func (UnimplementedTagServiceServer) mustEmbedUnimplementedTagServiceServer() {}

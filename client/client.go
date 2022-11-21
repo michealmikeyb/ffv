@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	tags_pb "github.com/michealmikeyb/ffv/tags"
+	users_pb "github.com/michealmikeyb/ffv/users"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -28,14 +28,14 @@ func main() {
 		log.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
-	c := tags_pb.NewTagServiceClient(conn)
+	c := users_pb.NewUserServiceClient(conn)
 
 	// Contact the server and print out its response.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	r, err := c.LikeTag(ctx, &tags_pb.Tag{Name: *tag})
+	r, err := c.GetPost(ctx, &users_pb.GetPostRequest{UserId: "6d9c1f1d-694f-11ed-b4a5-1c4d70a146e5"})
 	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+		log.Fatalf("could not add: %v", err)
 	}
-	log.Printf("Status: %s", r.GetStatus())
+	log.Printf("Status: %s", r.GetPost().Url)
 }
