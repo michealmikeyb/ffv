@@ -18,7 +18,7 @@ spec:
       terminationGracePeriodSeconds: 1800
       containers:
       - name: cassandra
-        image: gcr.io/google-samples/cassandra:v13
+        image: docker.io/library/cassandra:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 7000
@@ -64,12 +64,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: status.podIP
-        readinessProbe:
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - /ready-probe.sh
           initialDelaySeconds: 15
           timeoutSeconds: 5
         # These volume mounts are persistent. They are like inline claims,
@@ -77,7 +71,7 @@ spec:
         # the stateful pod volumes.
         volumeMounts:
         - name: cassandra-data
-          mountPath: /cassandra_data
+          mountPath: /var/lib/cassandra
   # These are converted to volume claims by the controller
   # and mounted at the paths mentioned above.
   # do not use these in production until ssd GCEPersistentDisk or other ssd pd
