@@ -2,9 +2,19 @@
 
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
+sudo usermod -aG docker $USER
 
-curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-sudo install minikube-linux-amd64 /usr/local/bin/minikube
+sudo apt install snapd
+
+# echo " cgroup_enable=memory cgroup_memory=1" >> sudo /boot/cmdline.txt
+sudo sed -i '$ s/$/ cgroup_enable=cpuset cgroup_enable=memory cgroup_memory=1/' /boot/cmdline.txt
+sudo snap install microk8s --classic --channel=1.25
+sudo usermod -a -G microk8s $USER
+sudo snap install kubectl --classic 
+sudo microk8s config > ~/.kube/config
+sudo microk8s.enable registry
+sudo microk8s.enable ingress
+sudo microk8s enable cert-manager
 
 curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
 chmod 700 get_helm.sh
@@ -15,7 +25,5 @@ helm repo add jetstack https://charts.jetstack.io
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 
-helm install cert-manager jetstack/cert-manager \
-     --namespace cert-manager --create-namespace --set installCRDs=true
 helm install k8ssandra-operator k8ssandra/k8ssandra-operator -n k8ssandra-operator --create-namespace
 
