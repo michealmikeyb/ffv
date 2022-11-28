@@ -7,11 +7,12 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"os"
 
 	"github.com/gocql/gocql"
+	models "github.com/michealmikeyb/ffv/models"
 	tags_pb "github.com/michealmikeyb/ffv/tags"
 	users_pb "github.com/michealmikeyb/ffv/users"
+	utils "github.com/michealmikeyb/ffv/utils"
 	"google.golang.org/grpc"
 )
 
@@ -24,61 +25,146 @@ type server struct {
 	users_pb.UnimplementedUserServiceServer
 }
 
-type Post struct {
-	Url    string   `cql:"url"`
-	Tags   []string `cql:"tags"`
-	Source string   `cql:"source"`
-}
-
-func GetCassandraSession() (*gocql.Session, error) {
-	cluster := gocql.NewCluster(os.Getenv("CASS_HOST"))
-	cluster.Authenticator = gocql.PasswordAuthenticator{
-		Username: os.Getenv("CASS_USER"),
-		Password: os.Getenv("CASS_PASS"),
+func (s *server) DislikePost(ctx context.Context, post_request *tags_pb.RatePostRequest) (*tags_pb.TagBaseResponse, error) {
+	session, err := utils.GetCassandraSession()
+	if err != nil {
+		return nil, err
 	}
-	return cluster.CreateSession()
+	defer session.Close()
+	for _, tag := range post_request.GetPost().Tags {
+		var (
+			tag_name string
+			weight   int
+			source   string
+			seen     []models.Post
+		)
 
-}
+		err := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ? AND tag_name = ? AND source = ?`, post_request.UserId, tag, post_request.Post.Source).WithContext(ctx).Scan(&tag_name, &weight, &source, &seen)
+		if err == gocql.ErrNotFound {
+			tag_name = tag
+			weight = 0
+			source = post_request.Post.Source
+			seen = make([]models.Post, 0)
+		} else if err != nil {
+			log.Fatal(err)
+		}
+		if weight > 0 {
+			weight = weight - 1
+		}
+		current_post := models.Post{
+			Url:     post_request.Post.Url,
+			Source:  post_request.Post.Source,
+			Tags:    post_request.Post.Tags,
+			Author:  post_request.Post.Author,
+			Likes:   int(post_request.Post.Likes),
+			Content: post_request.Post.Content,
+		}
+		seen = append(seen, current_post)
+		err = session.Query(`INSERT INTO ffv.tag_list (tag_name, weight, source, seen, user_id) VALUES (?, ?, ?, ?, ?)`, tag_name, weight, source, seen, post_request.UserId).Consistency(gocql.One).Exec()
+		if err != nil {
+			log.Fatal(err)
+		}
 
-func (s *server) LikeTag(ctx context.Context, in *tags_pb.Tag) (*tags_pb.TagBaseResponse, error) {
-	log.Printf("Received: %v", in.GetName())
+	}
+
 	return &tags_pb.TagBaseResponse{Status: "oks", Error: ""}, nil
 }
 
-func (s *server) AddUser(ctx context.Context, user *users_pb.AddUserRequest) (*users_pb.UserBaseResponse, error) {
-	log.Printf("Received: %v", user.MastadonId)
-	session, err := GetCassandraSession()
+func (s *server) LikePost(ctx context.Context, post_request *tags_pb.RatePostRequest) (*tags_pb.TagBaseResponse, error) {
+	session, err := utils.GetCassandraSession()
 	if err != nil {
 		return nil, err
 	}
 	defer session.Close()
-	err = session.Query(`INSERT INTO ffv.user (user_id, mastadon_id, mastadon_username) VALUES (?, ?, ?)`, gocql.TimeUUID(), user.MastadonId, user.MastadonUsername).WithContext(ctx).Exec()
-	if err != nil {
-		return nil, err
+	for _, tag := range post_request.GetPost().Tags {
+		var (
+			tag_name string
+			weight   int
+			source   string
+			seen     []models.Post
+		)
+
+		err := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ? AND tag_name = ? AND source = ?`, post_request.UserId, tag, post_request.Post.Source).WithContext(ctx).Scan(&tag_name, &weight, &source, &seen)
+		if err == gocql.ErrNotFound {
+			tag_name = tag
+			weight = 0
+			source = post_request.Post.Source
+			seen = make([]models.Post, 0)
+		} else if err != nil {
+			log.Fatal(err)
+		}
+		weight = weight + 1
+		current_post := models.Post{
+			Url:     post_request.Post.Url,
+			Source:  post_request.Post.Source,
+			Tags:    post_request.Post.Tags,
+			Author:  post_request.Post.Author,
+			Likes:   int(post_request.Post.Likes),
+			Content: post_request.Post.Content,
+		}
+		seen = append(seen, current_post)
+		err = session.Query(`INSERT INTO ffv.tag_list (tag_name, weight, source, seen, user_id) VALUES (?, ?, ?, ?, ?)`, tag_name, weight, source, seen, post_request.UserId).Consistency(gocql.One).Exec()
+		if err != nil {
+			log.Fatal(err)
+		}
+
 	}
-	return &users_pb.UserBaseResponse{Status: "ok", Error: ""}, nil
+
+	return &tags_pb.TagBaseResponse{Status: "oks", Error: ""}, nil
 }
 
-func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*users_pb.GetPostResponse, error) {
-	log.Printf("Received: %v", user.UserId)
-	session, err := GetCassandraSession()
+func (s *server) AddUser(ctx context.Context, user *users_pb.AddUserRequest) (*users_pb.AddUserResponse, error) {
+	log.Printf("Received: %v", user.MastodonId)
+	session, err := utils.GetCassandraSession()
 	if err != nil {
 		return nil, err
 	}
 	defer session.Close()
-	tag_list_scanner := session.Query(`SELECT tag_name, weight, tag_id, source, seen FROM ffv.tag_list WHERE user_id = ?`, user.UserId).WithContext(ctx).Iter().Scanner()
+	user_id := gocql.TimeUUID()
+	err = session.Query(`INSERT INTO ffv.user (user_id, mastodon_id, mastodon_username) VALUES (?, ?, ?)`, user_id, user.MastodonId, user.MastodonUsername).WithContext(ctx).Exec()
+	if err != nil {
+		return nil, err
+	}
+	err = session.Query(`INSERT INTO ffv.tag_list (user_id, tag_name, weight, source) VALUES (?, ?, ?, ?)`, user_id, "popular", 20, "mastodon").WithContext(ctx).Exec()
+	if err != nil {
+		return nil, err
+	}
+	return &users_pb.AddUserResponse{UserId: user_id.String()}, nil
+}
+
+func (s *server) GetUser(ctx context.Context, user *users_pb.GetUserRequest) (*users_pb.AddUserResponse, error) {
+	log.Printf("Received: %v", user.MastodonId)
+	session, err := utils.GetCassandraSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.Close()
+	var user_id gocql.UUID
+	err = session.Query(`SELECT  user_id FROM ffv.user WHERE mastodon_id = ?`, user.MastodonId).WithContext(ctx).Scan(&user_id)
+	if err != nil {
+		return nil, err
+	}
+	return &users_pb.AddUserResponse{UserId: user_id.String()}, nil
+}
+func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*users_pb.GetPostResponse, error) {
+	log.Printf("Received: %v", user.UserId)
+	session, err := utils.GetCassandraSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.Close()
+	tag_list_scanner := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ?`, user.UserId).WithContext(ctx).Iter().Scanner()
 	selection_list := []string{}
 	for tag_list_scanner.Next() {
 		var (
 			tag_name string
-			weight   float32
-			tag_id   string
+			weight   int
 			source   string
-			seen     []Post
+			seen     []models.Post
 		)
-		err := tag_list_scanner.Scan(&tag_name, &weight, &tag_id, &source, &seen)
+		err := tag_list_scanner.Scan(&tag_name, &weight, &source, &seen)
 		for i := 0; i < int(weight); i++ {
-			selection_list = append(selection_list, tag_id)
+			selection_list = append(selection_list, tag_name)
 		}
 		if err != nil {
 			return nil, err
@@ -88,8 +174,8 @@ func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*u
 	selected_tag := selection_list[selection_index]
 	var received_tag string
 
-	var buffer []Post
-	err = session.Query(`SELECT buffer, tag_id FROM ffv.tag WHERE tag_id = ? LIMIT 1`, selected_tag).WithContext(ctx).Consistency(gocql.One).Scan(&buffer, &received_tag)
+	var buffer []models.Post
+	err = session.Query(`SELECT buffer, name FROM ffv.tag WHERE name = ? LIMIT 1`, selected_tag).WithContext(ctx).Consistency(gocql.One).Scan(&buffer, &received_tag)
 	if err != nil {
 		return nil, err
 	}

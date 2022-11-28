@@ -4,10 +4,11 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "https://github.com/michealmikeyb/ffv/users";
 
-package ffv;
+package ffv.user;
 
 service UserService {
-  rpc AddUser(AddUserRequest) returns (UserBaseResponse) {}
+  rpc AddUser(AddUserRequest) returns (AddUserResponse) {}
+  rpc GetUser(GetUserRequest) returns (AddUserResponse) {}
   rpc GetPost(GetPostRequest) returns (GetPostResponse) {}
 }
 
@@ -19,8 +20,16 @@ message Post {
 }
 
 message AddUserRequest {
-  string mastadon_id = 2;
-  string mastadon_username = 3;
+  string mastodon_id = 2;
+  string mastodon_username = 3;
+}
+
+message AddUserResponse {
+  string user_id = 1;
+}
+
+message GetUserRequest {
+  string mastodon_id = 1;
 }
 
 message UserBaseResponse {

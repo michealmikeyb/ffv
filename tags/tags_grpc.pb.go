@@ -22,10 +22,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TagServiceClient interface {
-	LikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*TagBaseResponse, error)
-	DisikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*TagBaseResponse, error)
-	LikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*TagBaseResponse, error)
-	DisikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*TagBaseResponse, error)
+	LikePost(ctx context.Context, in *RatePostRequest, opts ...grpc.CallOption) (*TagBaseResponse, error)
+	DisikePost(ctx context.Context, in *RatePostRequest, opts ...grpc.CallOption) (*TagBaseResponse, error)
 }
 
 type tagServiceClient struct {
@@ -36,36 +34,18 @@ func NewTagServiceClient(cc grpc.ClientConnInterface) TagServiceClient {
 	return &tagServiceClient{cc}
 }
 
-func (c *tagServiceClient) LikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*TagBaseResponse, error) {
+func (c *tagServiceClient) LikePost(ctx context.Context, in *RatePostRequest, opts ...grpc.CallOption) (*TagBaseResponse, error) {
 	out := new(TagBaseResponse)
-	err := c.cc.Invoke(ctx, "/ffv.TagService/LikeTag", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/ffv.tags.TagService/LikePost", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tagServiceClient) DisikeTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*TagBaseResponse, error) {
+func (c *tagServiceClient) DisikePost(ctx context.Context, in *RatePostRequest, opts ...grpc.CallOption) (*TagBaseResponse, error) {
 	out := new(TagBaseResponse)
-	err := c.cc.Invoke(ctx, "/ffv.TagService/DisikeTag", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *tagServiceClient) LikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*TagBaseResponse, error) {
-	out := new(TagBaseResponse)
-	err := c.cc.Invoke(ctx, "/ffv.TagService/LikeTags", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *tagServiceClient) DisikeTags(ctx context.Context, in *Tags, opts ...grpc.CallOption) (*TagBaseResponse, error) {
-	out := new(TagBaseResponse)
-	err := c.cc.Invoke(ctx, "/ffv.TagService/DisikeTags", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/ffv.tags.TagService/DisikePost", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,10 +56,8 @@ func (c *tagServiceClient) DisikeTags(ctx context.Context, in *Tags, opts ...grp
 // All implementations must embed UnimplementedTagServiceServer
 // for forward compatibility
 type TagServiceServer interface {
-	LikeTag(context.Context, *Tag) (*TagBaseResponse, error)
-	DisikeTag(context.Context, *Tag) (*TagBaseResponse, error)
-	LikeTags(context.Context, *Tags) (*TagBaseResponse, error)
-	DisikeTags(context.Context, *Tags) (*TagBaseResponse, error)
+	LikePost(context.Context, *RatePostRequest) (*TagBaseResponse, error)
+	DisikePost(context.Context, *RatePostRequest) (*TagBaseResponse, error)
 	mustEmbedUnimplementedTagServiceServer()
 }
 
@@ -87,17 +65,11 @@ type TagServiceServer interface {
 type UnimplementedTagServiceServer struct {
 }
 
-func (UnimplementedTagServiceServer) LikeTag(context.Context, *Tag) (*TagBaseResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method LikeTag not implemented")
+func (UnimplementedTagServiceServer) LikePost(context.Context, *RatePostRequest) (*TagBaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LikePost not implemented")
 }
-func (UnimplementedTagServiceServer) DisikeTag(context.Context, *Tag) (*TagBaseResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DisikeTag not implemented")
-}
-func (UnimplementedTagServiceServer) LikeTags(context.Context, *Tags) (*TagBaseResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method LikeTags not implemented")
-}
-func (UnimplementedTagServiceServer) DisikeTags(context.Context, *Tags) (*TagBaseResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DisikeTags not implemented")
+func (UnimplementedTagServiceServer) DisikePost(context.Context, *RatePostRequest) (*TagBaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DisikePost not implemented")
 }
 func (UnimplementedTagServiceServer) mustEmbedUnimplementedTagServiceServer() {}
 
@@ -112,74 +84,38 @@ func RegisterTagServiceServer(s grpc.ServiceRegistrar, srv TagServiceServer) {
 	s.RegisterService(&TagService_ServiceDesc, srv)
 }
 
-func _TagService_LikeTag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Tag)
+func _TagService_LikePost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RatePostRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TagServiceServer).LikeTag(ctx, in)
+		return srv.(TagServiceServer).LikePost(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ffv.TagService/LikeTag",
+		FullMethod: "/ffv.tags.TagService/LikePost",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TagServiceServer).LikeTag(ctx, req.(*Tag))
+		return srv.(TagServiceServer).LikePost(ctx, req.(*RatePostRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TagService_DisikeTag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Tag)
+func _TagService_DisikePost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RatePostRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TagServiceServer).DisikeTag(ctx, in)
+		return srv.(TagServiceServer).DisikePost(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ffv.TagService/DisikeTag",
+		FullMethod: "/ffv.tags.TagService/DisikePost",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TagServiceServer).DisikeTag(ctx, req.(*Tag))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TagService_LikeTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Tags)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TagServiceServer).LikeTags(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/ffv.TagService/LikeTags",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TagServiceServer).LikeTags(ctx, req.(*Tags))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TagService_DisikeTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Tags)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TagServiceServer).DisikeTags(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/ffv.TagService/DisikeTags",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TagServiceServer).DisikeTags(ctx, req.(*Tags))
+		return srv.(TagServiceServer).DisikePost(ctx, req.(*RatePostRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -188,24 +124,16 @@ func _TagService_DisikeTags_Handler(srv interface{}, ctx context.Context, dec fu
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var TagService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "ffv.TagService",
+	ServiceName: "ffv.tags.TagService",
 	HandlerType: (*TagServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "LikeTag",
-			Handler:    _TagService_LikeTag_Handler,
+			MethodName: "LikePost",
+			Handler:    _TagService_LikePost_Handler,
 		},
 		{
-			MethodName: "DisikeTag",
-			Handler:    _TagService_DisikeTag_Handler,
-		},
-		{
-			MethodName: "LikeTags",
-			Handler:    _TagService_LikeTags_Handler,
-		},
-		{
-			MethodName: "DisikeTags",
-			Handler:    _TagService_DisikeTags_Handler,
+			MethodName: "DisikePost",
+			Handler:    _TagService_DisikePost_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

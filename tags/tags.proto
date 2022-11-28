@@ -3,22 +3,25 @@ syntax = "proto3";
 
 option go_package = "https://github.com/michealmikeyb/ffv/tags";
 
-package ffv;
+package ffv.tags;
 
 service TagService {
-  rpc LikeTag(Tag) returns (TagBaseResponse) {}
-  rpc DisikeTag(Tag) returns (TagBaseResponse) {}
-  rpc LikeTags(Tags) returns (TagBaseResponse) {}
-  rpc DisikeTags(Tags) returns (TagBaseResponse) {}
+  rpc LikePost(RatePostRequest) returns (TagBaseResponse) {}
+  rpc DisikePost(RatePostRequest) returns (TagBaseResponse) {}
 }
 
-message Tag {
-  string name = 1;
-  string id = 2;
+message RatePostRequest {
+  string user_id = 1;
+  Post post = 2;
 }
 
-message Tags {
-  repeated Tag tags = 1;
+message Post {
+  string url = 1;
+  repeated string tags = 2;
+  string source = 3;
+  string author = 4;
+  string content = 5;
+  int32 likes = 6;
 }
 
 message TagBaseResponse {
