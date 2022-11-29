@@ -16,7 +16,9 @@ message Post {
   string url = 1;
   repeated string tags = 2;
   string source = 3;
-  google.protobuf.Timestamp created_at = 4;
+  string author = 4;
+  string content = 5;
+  int32 likes = 6;
 }
 
 message AddUserRequest {

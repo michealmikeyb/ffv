@@ -17,7 +17,7 @@ const (
 )
 
 var (
-	addr = flag.String("addr", "localhost:50051", "the address to connect to")
+	addr = flag.String("addr", "127.0.0.1:50051", "the address to connect to")
 	tag  = flag.String("tag", defaultName, "tag to like")
 )
 
@@ -58,6 +58,25 @@ func getUser(mastodon_id string) {
 	}
 	log.Printf("User id: %s", r.GetUserId())
 }
+
+func getPost(user_id string) {
+
+	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := users_pb.NewUserServiceClient(conn)
+
+	// Contact the server and print out its response.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	r, err := c.GetPost(ctx, &users_pb.GetPostRequest{UserId: user_id})
+	if err != nil {
+		log.Fatalf("could not add: %v", err)
+	}
+	log.Printf("Content: %s", r.Post.GetContent())
+}
 func likeTag(user_id string, tag_name string) {
 
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -89,6 +108,6 @@ func likeTag(user_id string, tag_name string) {
 }
 func main() {
 	flag.Parse()
-	getUser("test")
+	getPost("9e1fc557-6fbb-11ed-a147-0242ac11000b")
 	// Set up a connection to the server.
 }

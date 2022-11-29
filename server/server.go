@@ -181,9 +181,12 @@ func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*u
 	}
 	selected_post := buffer[0]
 	return &users_pb.GetPostResponse{Post: &users_pb.Post{
-		Url:    selected_post.Url,
-		Tags:   selected_post.Tags,
-		Source: selected_post.Source,
+		Url:     selected_post.Url,
+		Tags:    selected_post.Tags,
+		Source:  selected_post.Source,
+		Content: selected_post.Content,
+		Likes:   int32(selected_post.Likes),
+		Author:  selected_post.Author,
 	}}, nil
 }
 
