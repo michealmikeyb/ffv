@@ -170,6 +170,9 @@ func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*u
 			return nil, err
 		}
 	}
+	if len(selection_list) < 1 {
+		return nil, fmt.Errorf("No tags match")
+	}
 	selection_index := rand.Intn(len(selection_list))
 	selected_tag := selection_list[selection_index]
 	var received_tag string

@@ -15,6 +15,7 @@ sudo microk8s config > ~/.kube/config
 sudo microk8s.enable registry
 sudo microk8s.enable ingress
 sudo microk8s enable cert-manager
+# follow steps here to add grpc port 50051 https://microk8s.io/docs/addon-ingress
 
 curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
 chmod 700 get_helm.sh
@@ -25,5 +26,8 @@ helm repo add jetstack https://charts.jetstack.io
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 pip install -U cqlsh
+wget https://dl.google.com/go/go1.16.7.linux-arm64.tar.gz
+sudo tar -C /usr/local/ -xzf go1.16.7.linux-arm64.tar.gz
+rm go1.16.7.linux-arm64.tar.gz 
 
 
