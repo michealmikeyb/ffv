@@ -25,6 +25,20 @@ type server struct {
 	users_pb.UnimplementedUserServiceServer
 }
 
+type tagSeenData struct {
+	seen   []models.Post
+	source string
+}
+
+func postsContains(s []models.Post, e models.Post) bool {
+	for _, a := range s {
+		if a.Content == e.Content && a.Author == e.Author && a.Source == e.Source {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *server) DislikePost(ctx context.Context, post_request *tags_pb.RatePostRequest) (*tags_pb.TagBaseResponse, error) {
 	session, err := utils.GetCassandraSession()
 	if err != nil {
@@ -155,6 +169,8 @@ func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*u
 	defer session.Close()
 	tag_list_scanner := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ?`, user.UserId).WithContext(ctx).Iter().Scanner()
 	selection_list := []string{}
+	tagSeenMap := make(map[string]tagSeenData)
+	log.Print("Found tags")
 	for tag_list_scanner.Next() {
 		var (
 			tag_name string
@@ -163,6 +179,7 @@ func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*u
 			seen     []models.Post
 		)
 		err := tag_list_scanner.Scan(&tag_name, &weight, &source, &seen)
+		tagSeenMap[tag_name] = tagSeenData{seen: seen, source: source}
 		for i := 0; i < int(weight); i++ {
 			selection_list = append(selection_list, tag_name)
 		}
@@ -175,6 +192,7 @@ func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*u
 	}
 	selection_index := rand.Intn(len(selection_list))
 	selected_tag := selection_list[selection_index]
+	log.Printf("Selected tag %s", selected_tag)
 	var received_tag string
 
 	var buffer []models.Post
@@ -182,7 +200,23 @@ func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*u
 	if err != nil {
 		return nil, err
 	}
-	selected_post := buffer[0]
+	i := 0
+	selected_post := buffer[i]
+	for postsContains(tagSeenMap[selected_tag].seen, selected_post) {
+		log.Printf("Seen %s", selected_post.Content)
+		i = i + 1
+		selected_post = buffer[i]
+	}
+	if entry, ok := tagSeenMap[selected_tag]; ok {
+		log.Printf("adding to seen")
+		entry.seen = append(entry.seen, selected_post)
+		tagSeenMap[selected_tag] = entry
+	}
+	err = session.Query("UPDATE ffv.tag_list SET seen = ? WHERE user_id = ? AND tag_name = ? AND source = ?", tagSeenMap[selected_tag].seen, user.UserId, selected_tag, tagSeenMap[selected_tag].source).Exec()
+	if err != nil {
+		return nil, err
+	}
+	log.Print("finished adding")
 	return &users_pb.GetPostResponse{Post: &users_pb.Post{
 		Url:     selected_post.Url,
 		Tags:    selected_post.Tags,

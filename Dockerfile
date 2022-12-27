@@ -8,13 +8,16 @@ RUN apk --update add ca-certificates git
 # Move to working directory /app
 WORKDIR /app
 
+COPY ./go.mod ./
+COPY ./go.sum ./
+
+# Download dependencies using go mod
+RUN go mod download
 
 # Copy the code into the container
 COPY . .
 
 
-# Download dependencies using go mod
-RUN go mod download
 
 
 # Build the application's binary
