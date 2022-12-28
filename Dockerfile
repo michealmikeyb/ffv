@@ -1,8 +1,5 @@
-FROM golang:alpine
+FROM golang:buster
 
-
-# Install git and ca-certificates (needed to be able to call HTTPS)
-RUN apk --update add ca-certificates git
 
 
 # Move to working directory /app
@@ -22,6 +19,9 @@ COPY . .
 
 # Build the application's binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o main ./server
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o updateBuffer ./update_buffer
+
+RUN chmod 777 /app/updateBuffer
 
 
 # Command to run the application when starting the container

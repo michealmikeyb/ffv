@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	err := tags_pb.UpdateBuffer("popular", "mastodon")
+	err := tags_pb.UpdateAllBuffers()
 	if err != nil {
 		log.Fatal("errored out")
 	}

@@ -78,3 +78,26 @@ func UpdateBuffer(tag_name string, tag_source string) error {
 		return fmt.Errorf("Tag source not supported")
 	}
 }
+
+func UpdateAllBuffers() error {
+	session, err := utils.GetCassandraSession()
+	if err != nil {
+		log.Printf("error connecting to cassandra")
+		return err
+	}
+	defer session.Close()
+	tags := session.Query(`SELECT name, source FROM ffv.tag`).Consistency(gocql.One).Iter().Scanner()
+	session.Close()
+	for tags.Next() {
+		var (
+			tag_name   string
+			tag_source string
+		)
+		err := tags.Scan(&tag_name, &tag_source)
+		if err != nil {
+			log.Fatal(err)
+		}
+		UpdateBuffer(tag_name, tag_source)
+	}
+	return nil
+}
