@@ -272,7 +272,7 @@ func GetPost(c *gin.Context) {
 func main() {
 	r := engine()
 	r.Use(gin.Logger())
-	if err := engine().Run(":8080"); err != nil {
+	if err := engine().Run(":80"); err != nil {
 		log.Fatal("Unable to start:", err)
 	}
 }
