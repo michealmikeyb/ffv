@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/boj/redistore v0.0.0-20180917114910-cd5dcc76aeff // indirect
+	github.com/gin-contrib/cors v1.4.0 // indirect
 	github.com/gin-gonic/contrib v0.0.0-20221130124618-7e01895a63f2 // indirect
 	github.com/gin-gonic/gin v1.8.2 // indirect
 	github.com/goccy/go-json v0.10.0 // indirect

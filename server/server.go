@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gocql/gocql"
@@ -294,8 +295,12 @@ func engine() *gin.Engine {
 	// 	private.GET("/me", me)
 	// 	private.GET("/status", status)
 	// }
-	r.POST("/:user_id/dislike_post", DislikePost)
-	r.POST("/:user_id/like_post", LikePost)
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"http://stakswipe.com"}
+
+	r.Use(cors.New(config))
+	r.POST("/dislike_post/:user_id", DislikePost)
+	r.POST("/like_post/:user_id", LikePost)
 	r.GET("/get_add_user", GetAddUser)
 	r.GET("/get_post", GetPost)
 
