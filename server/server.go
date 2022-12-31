@@ -1,20 +1,25 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log"
 	"math/rand"
-	"net"
+	"net/http"
+	"strings"
 
+	"github.com/gin-gonic/contrib/sessions"
+	"github.com/gin-gonic/gin"
 	"github.com/gocql/gocql"
 	models "github.com/michealmikeyb/ffv/models"
 	tags_pb "github.com/michealmikeyb/ffv/tags"
 	users_pb "github.com/michealmikeyb/ffv/users"
 	utils "github.com/michealmikeyb/ffv/utils"
-	"google.golang.org/grpc"
 )
+
+const userkey = "user"
+
+var secret = []byte("secret")
 
 var (
 	port = flag.Int("port", 50051, "The server port")
@@ -39,13 +44,20 @@ func postsContains(s []models.Post, e models.Post) bool {
 	return false
 }
 
-func (s *server) DislikePost(ctx context.Context, post_request *tags_pb.RatePostRequest) (*tags_pb.TagBaseResponse, error) {
+func DislikePost(c *gin.Context) {
 	session, err := utils.GetCassandraSession()
 	if err != nil {
-		return nil, err
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error connecting to database"})
+		return
 	}
 	defer session.Close()
-	for _, tag := range post_request.GetPost().Tags {
+	var dislikedPost models.Post
+	if err := c.BindJSON(&dislikedPost); err != nil {
+		log.Fatal(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't marshal json"})
+		return
+	}
+	for _, tag := range dislikedPost.Tags {
 		var (
 			tag_name string
 			weight   int
@@ -53,44 +65,56 @@ func (s *server) DislikePost(ctx context.Context, post_request *tags_pb.RatePost
 			seen     []models.Post
 		)
 
-		err := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ? AND tag_name = ? AND source = ?`, post_request.UserId, tag, post_request.Post.Source).WithContext(ctx).Scan(&tag_name, &weight, &source, &seen)
+		err := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ? AND tag_name = ? AND source = ?`, c.Param("user_id"), tag, dislikedPost.Source).Scan(&tag_name, &weight, &source, &seen)
 		if err == gocql.ErrNotFound {
 			tag_name = tag
 			weight = 0
-			source = post_request.Post.Source
+			source = dislikedPost.Source
 			seen = make([]models.Post, 0)
 		} else if err != nil {
 			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error finding tag"})
+			return
 		}
 		if weight > 0 {
 			weight = weight - 1
 		}
 		current_post := models.Post{
-			Url:     post_request.Post.Url,
-			Source:  post_request.Post.Source,
-			Tags:    post_request.Post.Tags,
-			Author:  post_request.Post.Author,
-			Likes:   int(post_request.Post.Likes),
-			Content: post_request.Post.Content,
+			Url:     dislikedPost.Url,
+			Source:  dislikedPost.Source,
+			Tags:    dislikedPost.Tags,
+			Author:  dislikedPost.Author,
+			Likes:   int(dislikedPost.Likes),
+			Content: dislikedPost.Content,
 		}
 		seen = append(seen, current_post)
-		err = session.Query(`INSERT INTO ffv.tag_list (tag_name, weight, source, seen, user_id) VALUES (?, ?, ?, ?, ?)`, tag_name, weight, source, seen, post_request.UserId).Consistency(gocql.One).Exec()
+		err = session.Query(`INSERT INTO ffv.tag_list (tag_name, weight, source, seen, user_id) VALUES (?, ?, ?, ?, ?)`, tag_name, weight, source, seen, c.Param("user_id")).Consistency(gocql.One).Exec()
 		if err != nil {
 			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error finding tag"})
+			return
 		}
 
 	}
 
-	return &tags_pb.TagBaseResponse{Status: "oks", Error: ""}, nil
+	c.JSON(http.StatusOK, gin.H{"success": "disliked post"})
 }
 
-func (s *server) LikePost(ctx context.Context, post_request *tags_pb.RatePostRequest) (*tags_pb.TagBaseResponse, error) {
+func LikePost(c *gin.Context) {
 	session, err := utils.GetCassandraSession()
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error connecting to database"})
+		return
 	}
 	defer session.Close()
-	for _, tag := range post_request.GetPost().Tags {
+	var likedPost models.Post
+	if err := c.BindJSON(&likedPost); err != nil {
+		log.Fatal(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't marshal json"})
+		return
+	}
+	for _, tag := range likedPost.Tags {
 		var (
 			tag_name string
 			weight   int
@@ -98,76 +122,94 @@ func (s *server) LikePost(ctx context.Context, post_request *tags_pb.RatePostReq
 			seen     []models.Post
 		)
 
-		err := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ? AND tag_name = ? AND source = ?`, post_request.UserId, tag, post_request.Post.Source).WithContext(ctx).Scan(&tag_name, &weight, &source, &seen)
+		err := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ? AND tag_name = ? AND source = ?`, c.Param("user_id"), tag, likedPost.Source).Scan(&tag_name, &weight, &source, &seen)
 		if err == gocql.ErrNotFound {
 			tag_name = tag
 			weight = 0
-			source = post_request.Post.Source
+			source = likedPost.Source
 			seen = make([]models.Post, 0)
 		} else if err != nil {
 			log.Fatal(err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't get tag"})
+			return
 		}
+
 		weight = weight + 1
 		current_post := models.Post{
-			Url:     post_request.Post.Url,
-			Source:  post_request.Post.Source,
-			Tags:    post_request.Post.Tags,
-			Author:  post_request.Post.Author,
-			Likes:   int(post_request.Post.Likes),
-			Content: post_request.Post.Content,
+			Url:     likedPost.Url,
+			Source:  likedPost.Source,
+			Tags:    likedPost.Tags,
+			Author:  likedPost.Author,
+			Likes:   int(likedPost.Likes),
+			Content: likedPost.Content,
 		}
 		seen = append(seen, current_post)
-		err = session.Query(`INSERT INTO ffv.tag_list (tag_name, weight, source, seen, user_id) VALUES (?, ?, ?, ?, ?)`, tag_name, weight, source, seen, post_request.UserId).Consistency(gocql.One).Exec()
+		err = session.Query(`INSERT INTO ffv.tag_list (tag_name, weight, source, seen, user_id) VALUES (?, ?, ?, ?, ?)`, tag_name, weight, source, seen, c.Param("user_id")).Consistency(gocql.One).Exec()
 		if err != nil {
 			log.Fatal(err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't save tag"})
+			return
 		}
 
+		err = tags_pb.UpdateBuffer(tag, likedPost.Source)
+		if err != nil {
+			log.Fatal(err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't update buffer"})
+			return
+		}
 	}
 
-	return &tags_pb.TagBaseResponse{Status: "oks", Error: ""}, nil
+	c.JSON(http.StatusOK, gin.H{"success": "disliked post"})
 }
 
-func (s *server) AddUser(ctx context.Context, user *users_pb.AddUserRequest) (*users_pb.AddUserResponse, error) {
-	log.Printf("Received: %v", user.MastodonId)
+func GetAddUser(c *gin.Context) {
 	session, err := utils.GetCassandraSession()
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error connecting to database"})
+		return
 	}
 	defer session.Close()
-	user_id := gocql.TimeUUID()
-	err = session.Query(`INSERT INTO ffv.user (user_id, mastodon_id, mastodon_username) VALUES (?, ?, ?)`, user_id, user.MastodonId, user.MastodonUsername).WithContext(ctx).Exec()
-	if err != nil {
-		return nil, err
+	mastodon_id := c.Query("mastodon_id")
+	var user_id string
+
+	err = session.Query(`SELECT  user_id FROM ffv.user WHERE mastodon_id = ?`, mastodon_id).Scan(&user_id)
+	if err == gocql.ErrNotFound {
+		user_id = gocql.TimeUUID().String()
+		err = session.Query(`INSERT INTO ffv.user (user_id, mastodon_id, mastodon_username) VALUES (?, ?, ?)`, user_id, mastodon_id, c.DefaultQuery("mastodon_id", "")).Exec()
+		if err != nil {
+			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "couldn't get "})
+			return
+		}
+		err = session.Query(`INSERT INTO ffv.tag_list (user_id, tag_name, weight, source) VALUES (?, ?, ?, ?)`, user_id, "popular", 20, "mastodon").Exec()
+		if err != nil {
+			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "couldn't get "})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"user_id": user_id})
+		return
+	} else if err != nil {
+		log.Fatal(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't get "})
+		return
 	}
-	err = session.Query(`INSERT INTO ffv.tag_list (user_id, tag_name, weight, source) VALUES (?, ?, ?, ?)`, user_id, "popular", 20, "mastodon").WithContext(ctx).Exec()
-	if err != nil {
-		return nil, err
-	}
-	return &users_pb.AddUserResponse{UserId: user_id.String()}, nil
+	c.JSON(http.StatusOK, gin.H{"user_id": user_id})
+	return
+
 }
 
-func (s *server) GetUser(ctx context.Context, user *users_pb.GetUserRequest) (*users_pb.AddUserResponse, error) {
-	log.Printf("Received: %v", user.MastodonId)
+func GetPost(c *gin.Context) {
 	session, err := utils.GetCassandraSession()
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error connecting to database"})
+		return
 	}
 	defer session.Close()
-	var user_id gocql.UUID
-	err = session.Query(`SELECT  user_id FROM ffv.user WHERE mastodon_id = ?`, user.MastodonId).WithContext(ctx).Scan(&user_id)
-	if err != nil {
-		return nil, err
-	}
-	return &users_pb.AddUserResponse{UserId: user_id.String()}, nil
-}
-func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*users_pb.GetPostResponse, error) {
-	log.Printf("Received: %v", user.UserId)
-	session, err := utils.GetCassandraSession()
-	if err != nil {
-		return nil, err
-	}
-	defer session.Close()
-	tag_list_scanner := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ?`, user.UserId).WithContext(ctx).Iter().Scanner()
+	user_id := c.Query("user_id")
+	tag_list_scanner := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ?`, user_id).Iter().Scanner()
 	selection_list := []string{}
 	tagSeenMap := make(map[string]tagSeenData)
 	log.Print("Found tags")
@@ -184,11 +226,15 @@ func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*u
 			selection_list = append(selection_list, tag_name)
 		}
 		if err != nil {
-			return nil, err
+			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error getting tag list"})
+			return
 		}
 	}
 	if len(selection_list) < 1 {
-		return nil, fmt.Errorf("No tags match")
+		log.Fatal(fmt.Errorf("No tags match"))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error no tags match"})
+		return
 	}
 	selection_index := rand.Intn(len(selection_list))
 	selected_tag := selection_list[selection_index]
@@ -196,9 +242,11 @@ func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*u
 	var received_tag string
 
 	var buffer []models.Post
-	err = session.Query(`SELECT buffer, name FROM ffv.tag WHERE name = ? LIMIT 1`, selected_tag).WithContext(ctx).Consistency(gocql.One).Scan(&buffer, &received_tag)
+	err = session.Query(`SELECT buffer, name FROM ffv.tag WHERE name = ? LIMIT 1`, selected_tag).Consistency(gocql.One).Scan(&buffer, &received_tag)
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error no tag record found"})
+		return
 	}
 	i := 0
 	selected_post := buffer[i]
@@ -212,32 +260,109 @@ func (s *server) GetPost(ctx context.Context, user *users_pb.GetPostRequest) (*u
 		entry.seen = append(entry.seen, selected_post)
 		tagSeenMap[selected_tag] = entry
 	}
-	err = session.Query("UPDATE ffv.tag_list SET seen = ? WHERE user_id = ? AND tag_name = ? AND source = ?", tagSeenMap[selected_tag].seen, user.UserId, selected_tag, tagSeenMap[selected_tag].source).Exec()
+	err = session.Query("UPDATE ffv.tag_list SET seen = ? WHERE user_id = ? AND tag_name = ? AND source = ?", tagSeenMap[selected_tag].seen, user_id, selected_tag, tagSeenMap[selected_tag].source).Exec()
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error getting tag list"})
+		return
 	}
 	log.Print("finished adding")
-	return &users_pb.GetPostResponse{Post: &users_pb.Post{
-		Url:     selected_post.Url,
-		Tags:    selected_post.Tags,
-		Source:  selected_post.Source,
-		Content: selected_post.Content,
-		Likes:   int32(selected_post.Likes),
-		Author:  selected_post.Author,
-	}}, nil
+	c.IndentedJSON(http.StatusOK, selected_post)
+}
+func main() {
+	r := engine()
+	r.Use(gin.Logger())
+	if err := engine().Run(":8080"); err != nil {
+		log.Fatal("Unable to start:", err)
+	}
 }
 
-func main() {
-	flag.Parse()
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+func engine() *gin.Engine {
+	r := gin.New()
+
+	// // Setup the cookie store for session management
+	// r.Use(sessions.Sessions("mysession", sessions.NewCookieStore(secret)))
+
+	// // Login and logout routes
+	// r.POST("/login", login)
+	// r.GET("/logout", logout)
+
+	// // Private group, require authentication to access
+	// private := r.Group("/private")
+	// private.Use(AuthRequired)
+	// {
+	// 	private.GET("/me", me)
+	// 	private.GET("/status", status)
+	// }
+	r.POST("/:user_id/dislike_post", DislikePost)
+	r.POST("/:user_id/like_post", LikePost)
+	r.GET("/get_add_user", GetAddUser)
+	r.GET("/get_post", GetPost)
+
+	return r
+}
+
+// AuthRequired is a simple middleware to check the session
+func AuthRequired(c *gin.Context) {
+	session := sessions.Default(c)
+	user := session.Get(userkey)
+	if user == nil {
+		// Abort the request with the appropriate error code
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
 	}
-	s := grpc.NewServer()
-	tags_pb.RegisterTagServiceServer(s, &server{})
-	users_pb.RegisterUserServiceServer(s, &server{})
-	log.Printf("server listening at %v", lis.Addr())
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	// Continue down the chain to handler etc
+	c.Next()
+}
+
+// login is a handler that parses a form and checks for specific data
+func login(c *gin.Context) {
+	session := sessions.Default(c)
+	username := c.PostForm("username")
+	password := c.PostForm("password")
+
+	// Validate form input
+	if strings.Trim(username, " ") == "" || strings.Trim(password, " ") == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Parameters can't be empty"})
+		return
 	}
+
+	// Check for username and password match, usually from a database
+	if username != "hello" || password != "itsme" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed"})
+		return
+	}
+
+	// Save the username in the session
+	session.Set(userkey, username) // In real world usage you'd set this to the users ID
+	if err := session.Save(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save session"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
+}
+
+func logout(c *gin.Context) {
+	session := sessions.Default(c)
+	user := session.Get(userkey)
+	if user == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session token"})
+		return
+	}
+	session.Delete(userkey)
+	if err := session.Save(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save session"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
+}
+
+func me(c *gin.Context) {
+	session := sessions.Default(c)
+	user := session.Get(userkey)
+	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
+func status(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "You are logged in"})
 }

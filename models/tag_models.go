@@ -5,12 +5,12 @@ import (
 )
 
 type Post struct {
-	Url     string   `cql:"url"`
-	Tags    []string `cql:"tags"`
-	Source  string   `cql:"source"`
-	Author  string   `cql:"author"`
-	Content string   `cql:"content"`
-	Likes   int      `cql:"likes"`
+	Url     string   `cql:"url" json:"url"`
+	Tags    []string `cql:"tags" json:"tags"`
+	Source  string   `cql:"source" json:"source"`
+	Author  string   `cql:"author" json:"author"`
+	Content string   `cql:"content" json:"content"`
+	Likes   int      `cql:"likes" json:"likes"`
 }
 
 type MastodonResponse struct {

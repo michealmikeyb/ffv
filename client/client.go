@@ -17,7 +17,7 @@ const (
 )
 
 var (
-	addr = flag.String("addr", "127.0.0.1:50051", "the address to connect to")
+	addr = flag.String("addr", "api.stakswipe.com:50051", "the address to connect to")
 	tag  = flag.String("tag", defaultName, "tag to like")
 )
 
@@ -31,7 +31,7 @@ func addUser(mastodon_id string) {
 	c := users_pb.NewUserServiceClient(conn)
 
 	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	r, err := c.AddUser(ctx, &users_pb.AddUserRequest{MastodonUsername: "test-user", MastodonId: mastodon_id})
 	if err != nil {
@@ -50,7 +50,7 @@ func getUser(mastodon_id string) {
 	c := users_pb.NewUserServiceClient(conn)
 
 	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	r, err := c.GetUser(ctx, &users_pb.GetUserRequest{MastodonId: "test"})
 	if err != nil {
@@ -69,7 +69,7 @@ func getPost(user_id string) {
 	c := users_pb.NewUserServiceClient(conn)
 
 	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	r, err := c.GetPost(ctx, &users_pb.GetPostRequest{UserId: user_id})
 	if err != nil {
@@ -87,7 +87,7 @@ func likeTag(user_id string, tag_name string) {
 	c := tags_pb.NewTagServiceClient(conn)
 
 	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	rate_post_request := tags_pb.RatePostRequest{
 		UserId: user_id,
@@ -108,6 +108,7 @@ func likeTag(user_id string, tag_name string) {
 }
 func main() {
 	flag.Parse()
-	getPost("9e1fc557-6fbb-11ed-a147-0242ac11000b")
+	//addUser("mikey")
+	getPost("fa4ee39b-8653-11ed-bfa4-0ec0a12f227a")
 	// Set up a connection to the server.
 }
