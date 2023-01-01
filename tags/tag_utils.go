@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"strconv"
 
 	"github.com/gocql/gocql"
 	models "github.com/michealmikeyb/ffv/models"
@@ -20,13 +21,19 @@ func (a ByLikes) Len() int           { return len(a) }
 func (a ByLikes) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByLikes) Less(i, j int) bool { return a[i].Likes < a[j].Likes }
 
-func UpdateBuffer(tag_name string, tag_source string) error {
+func UpdateBuffer(tag_name string, tag_source string, opts ...int) error {
+	var bufferSize int
+	if len(opts) == 0 {
+		bufferSize = 20
+	} else {
+		bufferSize = opts[0]
+	}
 	if tag_source == "mastodon" {
 		var mastodon_tag_url string
 		if tag_name == "popular" {
-			mastodon_tag_url = fmt.Sprintf("%s/%s", mastodon_base_url, "api/v1/trends/statuses")
+			mastodon_tag_url = fmt.Sprintf("%s/%s?limit=%d", mastodon_base_url, "api/v1/trends/statuses", bufferSize)
 		} else {
-			mastodon_tag_url = fmt.Sprintf("%s/%s/%s", mastodon_base_url, "api/v1/timelines/tag", tag_name)
+			mastodon_tag_url = fmt.Sprintf("%s/%s/%s?limit=%d", mastodon_base_url, "api/v1/timelines/tag", tag_name, bufferSize)
 		}
 		resp, err := http.Get(mastodon_tag_url)
 		if err != nil {
@@ -40,6 +47,26 @@ func UpdateBuffer(tag_name string, tag_source string) error {
 		if err != nil {
 			log.Printf("error marshalling json")
 			return err
+		}
+		offset := bufferSize
+		for len(mas_responses) < bufferSize {
+			new_mastodon_tag_url := mastodon_tag_url + "&offset=" + strconv.Itoa(offset)
+			log.Printf("tag url: %s", new_mastodon_tag_url)
+			resp, err := http.Get(new_mastodon_tag_url)
+			if err != nil {
+				log.Printf("error getting mastodon response")
+				return err
+			}
+			defer resp.Body.Close()
+
+			var new_mas_responses []models.MastodonResponse
+			err = json.NewDecoder(resp.Body).Decode(&new_mas_responses)
+			if err != nil {
+				log.Printf("error marshalling json")
+				return err
+			}
+			mas_responses = append(mas_responses, new_mas_responses...)
+			offset = offset + 20
 		}
 
 		var posts []models.Post
@@ -75,7 +102,7 @@ func UpdateBuffer(tag_name string, tag_source string) error {
 		return nil
 
 	} else {
-		return fmt.Errorf("Tag source not supported")
+		return fmt.Errorf("Tag source not supported: " + tag_source)
 	}
 }
 

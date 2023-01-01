@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-contrib/cors"
@@ -23,7 +24,7 @@ const userkey = "user"
 var secret = []byte("secret")
 
 var (
-	port = flag.Int("port", 50051, "The server port")
+	port = flag.Int("port", 80, "The server port")
 )
 
 type server struct {
@@ -122,7 +123,7 @@ func LikePost(c *gin.Context) {
 			source   string
 			seen     []models.Post
 		)
-
+		log.Printf("Liking tag: %s for user: %s", tag_name, c.Param("user_id"))
 		err := session.Query(`SELECT tag_name, weight, source, seen FROM ffv.tag_list WHERE user_id = ? AND tag_name = ? AND source = ?`, c.Param("user_id"), tag, likedPost.Source).Scan(&tag_name, &weight, &source, &seen)
 		if err == gocql.ErrNotFound {
 			tag_name = tag
@@ -145,6 +146,7 @@ func LikePost(c *gin.Context) {
 			Content: likedPost.Content,
 		}
 		seen = append(seen, current_post)
+		log.Printf("inserting into tag_list tag: %s with weight: %d", tag_name, weight)
 		err = session.Query(`INSERT INTO ffv.tag_list (tag_name, weight, source, seen, user_id) VALUES (?, ?, ?, ?, ?)`, tag_name, weight, source, seen, c.Param("user_id")).Consistency(gocql.One).Exec()
 		if err != nil {
 			log.Fatal(err)
@@ -239,11 +241,13 @@ func GetPost(c *gin.Context) {
 	}
 	selection_index := rand.Intn(len(selection_list))
 	selected_tag := selection_list[selection_index]
+	selected_tag = "popular"
 	log.Printf("Selected tag %s", selected_tag)
 	var received_tag string
+	var received_source string
 
 	var buffer []models.Post
-	err = session.Query(`SELECT buffer, name FROM ffv.tag WHERE name = ? LIMIT 1`, selected_tag).Consistency(gocql.One).Scan(&buffer, &received_tag)
+	err = session.Query(`SELECT buffer, name, source FROM ffv.tag WHERE name = ? LIMIT 1`, selected_tag).Consistency(gocql.One).Scan(&buffer, &received_tag, &received_source)
 	if err != nil {
 		log.Fatal(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "error no tag record found"})
@@ -251,16 +255,45 @@ func GetPost(c *gin.Context) {
 	}
 	i := 0
 	selected_post := buffer[i]
-	for postsContains(tagSeenMap[selected_tag].seen, selected_post) {
-		log.Printf("Seen %s", selected_post.Content)
+	iterate := postsContains(tagSeenMap[selected_tag].seen, selected_post)
+	for iterate {
 		i = i + 1
+		if len(buffer) == i {
+			newSize := len(buffer) + 10
+			log.Printf("reloading buffer for %s, new size %d", selected_tag, newSize)
+			log.Printf("Size of seen %d", len(tagSeenMap[selected_tag].seen))
+			realBuffer := []models.Post{}
+			for _, post := range buffer {
+				if !postsContains(realBuffer, post) {
+					realBuffer = append(realBuffer, post)
+				}
+			}
+			log.Printf("Size of buffer %d", len(realBuffer))
+			tags_pb.UpdateBuffer(selected_tag, received_source, newSize)
+			err = session.Query(`SELECT buffer, name, source FROM ffv.tag WHERE name = ? LIMIT 1`, selected_tag).Consistency(gocql.One).Scan(&buffer, &received_tag, &received_source)
+			if err != nil {
+				log.Fatal(err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "error no tag record found"})
+				return
+			}
+			if len(buffer) != newSize {
+				log.Print("Buffer could not be fetched")
+			}
+			i = 0
+		}
 		selected_post = buffer[i]
+		log.Printf("Checking seen %s", selected_post.Content)
+		iterate = postsContains(tagSeenMap[selected_tag].seen, selected_post)
+		if iterate {
+			log.Printf("Seen %s", selected_post.Content)
+		}
 	}
 	if entry, ok := tagSeenMap[selected_tag]; ok {
-		log.Printf("adding to seen")
+		log.Printf("adding to seen %s ", selected_post.Content)
 		entry.seen = append(entry.seen, selected_post)
 		tagSeenMap[selected_tag] = entry
 	}
+	log.Printf("setting seen where user %s, tag %s, source %s ", user_id, selected_tag, tagSeenMap[selected_tag].source)
 	err = session.Query("UPDATE ffv.tag_list SET seen = ? WHERE user_id = ? AND tag_name = ? AND source = ?", tagSeenMap[selected_tag].seen, user_id, selected_tag, tagSeenMap[selected_tag].source).Exec()
 	if err != nil {
 		log.Fatal(err)
@@ -273,7 +306,7 @@ func GetPost(c *gin.Context) {
 func main() {
 	r := engine()
 	r.Use(gin.Logger())
-	if err := engine().Run(":80"); err != nil {
+	if err := engine().Run(":" + strconv.Itoa(*port)); err != nil {
 		log.Fatal("Unable to start:", err)
 	}
 }
@@ -297,6 +330,7 @@ func engine() *gin.Engine {
 	// }
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{"http://stakswipe.com"}
+	config.AllowCredentials = true
 
 	r.Use(cors.New(config))
 	r.POST("/dislike_post/:user_id", DislikePost)
