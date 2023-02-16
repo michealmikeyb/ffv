@@ -15,6 +15,7 @@ sudo microk8s config > ~/.kube/config
 sudo microk8s.enable registry
 sudo microk8s.enable ingress
 sudo microk8s enable cert-manager
+sudo microk8s join 192.168.1.104:25000/18b685dd8f9702c0862758f3366425e0/666909b1e6cd --worker
 # follow steps here to add grpc port 50051 https://microk8s.io/docs/addon-ingress
 
 curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
